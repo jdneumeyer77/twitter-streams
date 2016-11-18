@@ -1,13 +1,8 @@
 case class Tweet(
-	contributors: Option[Seq[Contributor]],
-	coordinates: Option[Coordinates],
 	created_at: String,
-	current_user_retweet: Option[Map[String, String]],
 	entities: Entities,
 	favorite_count: Option[Int],
-	favorited: Option[Boolean],
 	filter_level: String,
-	id: Long,
 	id_str: String,
 	in_reply_to_screen_name: Option[String],
 	in_reply_to_status_id: Option[Long],
@@ -17,20 +12,14 @@ case class Tweet(
 	lang: Option[String],
 	place: Option[Place],
 	possibly_sensitive: Option[Boolean],
-	quoted_status_id: Option[Long],
 	quoted_status_id_str: Option[String],
 	quoted_status: Option[Tweet],
-	scopes: Option[Map[String, String]],
 	retweet_count: Int,
 	retweeted: Option[Boolean],
 	retweeted_status: Option[Tweet],
 	source: String,
 	text: String,
-	truncated: Boolean,
-	user: Users,
-	withheldCopyright: Option[Boolean],
-	withheldInCountries: Option[Seq[String]],
-	withheldScope: Option[String]
+	truncated: Boolean
 )
 case class Users(
 	contributors_enabled: Boolean,
@@ -68,7 +57,7 @@ case class Users(
 	`protected`: Boolean,
 	screen_name: String,
 	show_all_inline_media: Option[Boolean],
-	status: Option[Tweets],
+//	status: Option[Tweets],
 	statuses_count: Int,
 	time_zone: Option[String],
 	url: Option[String],
@@ -78,8 +67,6 @@ case class Users(
 	withheld_scope: Option[String]
 )
 case class Tweets(
-	contributors: Seq[Contributor],
-	coordinates: Coordinates,
 	created_at: String,
 	current_user_retweet: Option[Map[String, String]],
 	entities: Entities,
@@ -94,7 +81,7 @@ case class Tweets(
 	in_reply_to_user_id: Option[Long],
 	in_reply_to_user_id_str: Option[String],
 	lang: Option[String],
-	place: Option[Place],
+//	place: Option[Place],
 	possibly_sensitive: Option[Boolean],
 	quoted_status_id: Option[Long],
 	quoted_status_id_str: Option[String],
@@ -105,15 +92,10 @@ case class Tweets(
 	retweeted_status: Option[Tweet],
 	source: String,
 	text: String,
-	truncated: Boolean,
-	user: Users,
-	withheld_copyright: Option[Boolean],
-	withheld_in_countries: Option[Seq[String]],
-	withheld_scope: Option[String]
+	truncated: Boolean
 )
 case class Place(
 	attributes: Map[String, String],
-	bounding_box: BoundingBox,
 	country: String,
 	country_code: String,
 	full_name: String,
@@ -136,9 +118,8 @@ case class Media(
 	`type`: String,
 	url: String
 )
-case class BoundingBox(coordinates: Seq[Seq[Seq[Float]]], `type`: String)
-case class Contributor(id: Long, id_str: String, screen_name: String)
-case class Coordinates(coordinates: Seq[Float], `type`: String)
+
+
 case class Entities(hashtags: Seq[Hashtag], media: Seq[Media], urls: Seq[Url], user_mentions: Option[Seq[UserMention]])
 case class Sizes(thumb: Size, large: Size, medium: Size, small: Size)
 case class Size(h: Int, w: Int, resize: String)

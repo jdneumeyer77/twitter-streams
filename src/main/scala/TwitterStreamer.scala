@@ -10,7 +10,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpHeader.ParsingResult
 import akka.http.scaladsl.model._
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{Framing, Source}
 import akka.util.ByteString
 import com.hunorkovacs.koauth.domain.KoauthRequest
 import com.hunorkovacs.koauth.service.consumer.DefaultConsumerService
@@ -54,17 +54,26 @@ object TwitterStreamer extends App {
 
 	val connectionFlow = Http().outgoingConnectionHttps(source.authority.host.address, 443)
 
-	Source.single(httpRequest)
+  val newline = ByteString("\r\n")
+
+	val x = Source.single(httpRequest)
 				.via(connectionFlow)
 				.flatMapConcat {
 					case response if response.status.isSuccess() =>
-						response.entity.dataBytes
+						response.entity.withoutSizeLimit().dataBytes
 					case other =>
 						println(s"Failed! $other")
 						Source.empty
-				}.filter(_.startsWith("\r\n")).map {
-					_.utf8String
-				}.runForeach(println).onComplete(_ => system.terminate)
+				}.via(Framing.delimiter(newline, Int.MaxValue))
+    //      .map(_.utf8String)
+        .mapConcat { byteStrTweet =>
+					parseOpt(byteStrTweet.utf8String).flatMap(_.extractOpt[Tweet]).toList
+				}.runForeach(tweet => println(tweet.id_str))//.onComplete(_ => system.terminate)
+
+  x.onComplete { done =>
+    println(done)
+    system.terminate()
+  }
 
 	def generateAuthHeader() = {
 		val oauthHeader: Future[String] = consumer.createOauthenticatedRequest(
