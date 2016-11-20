@@ -9,5 +9,7 @@ libraryDependencies ++= Seq(
 	"com.typesafe.akka" %% "akka-http-experimental" % "2.4.11",
 	"com.typesafe.akka" %% "akka-http-core" % "2.4.11",
 	"com.hunorkovacs" %% "koauth" % "1.1.0", // no scala 2.12 support. :(
-	"org.json4s" %% "json4s-native" % "3.4.0"
+	"de.knutwalker" %% "akka-stream-circe" % "3.1.0",
+	"de.knutwalker" %% "akka-http-circe" % "3.1.0",
+	"io.circe" %% "circe-generic" % "0.5.0"
 )
