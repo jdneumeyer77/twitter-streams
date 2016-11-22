@@ -12,7 +12,7 @@ case class TweetEvent(json: Json) extends StreamedTweetType
 case class WarningEvent(json: Json) extends StreamedTweetType
 case class Event(json: Json) extends StreamedTweetType
 case class SingleFieldEvent(json: Json) extends StreamedTweetType
-object UnknownEvent extends StreamedTweetType
+case class UnknownEvent(json: Json) extends StreamedTweetType
 
 object JsonProcessing extends JsonProcessing
 
@@ -50,7 +50,11 @@ trait JsonProcessing {
   private def decodeTweet(implicit decoder: Decoder[Tweet]): Flow[StreamedTweetType, Tweet, NotUsed] = {
     Flow[StreamedTweetType].collect {
       case TweetEvent(json) => decoder.decodeJson(json)
-    }.collect {
+    }.map { x =>
+      x.leftMap(x => println(x.toString()))
+      x
+    }
+      .collect {
       case Xor.Right(tweet) => tweet
     }
   }
@@ -61,8 +65,10 @@ trait JsonProcessing {
     if(obj.exists(jsonHasFields("warning"))) WarningEvent(json)
     else if(obj.exists(jsonHasFields("event"))) Event(json)
     else if(obj.exists(_.size == 1)) SingleFieldEvent(json)
-    else if(obj.exists(jsonHasFields("created_at", "text", "id_str"))) TweetEvent(json) // likely...
-    else UnknownEvent
+    else if(obj.exists(jsonHasFields("id_str", "text", "entities"))) TweetEvent(json) // likely...
+    else {
+      UnknownEvent(json)
+    }
   }
 
   def jsonHasFields(fields: String*)(json: JsonObject): Boolean = {
