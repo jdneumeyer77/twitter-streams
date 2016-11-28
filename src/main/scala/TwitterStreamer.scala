@@ -1,58 +1,31 @@
-import java.util.concurrent.atomic.AtomicLong
-
-import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl._
-import akka.util.ByteString
-import com.hunorkovacs.koauth.service.consumer.DefaultConsumerService
-import io.circe._
-import io.circe.generic.semiauto._
-import io.circe.generic.auto._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 
+object AkkaContext {
+  implicit val system = ActorSystem()
+  implicit val materializer = ActorMaterializer()
+}
+
 object TwitterStreamer extends App {
+  import Stats._
+  import Flows._
+  import AkkaContext._
 
   private val url = "https://stream.twitter.com/1.1/statuses/sample.json"
   private val source = Uri(url)
 
-  private val newline = ByteString("\r\n")
-
-  private implicit val system = ActorSystem()
-  private implicit val materializer = ActorMaterializer()
-  private val oauthConsumer = new DefaultConsumerService(system.dispatcher)
-
-  private implicit val TweetDecoder: Decoder[Tweet] = deriveDecoder[Tweet]
-
-  val connectionFlow = Http().outgoingConnectionHttps(source.authority.host.address, 443)
-
-  val classifyTweetsFlow = Flow[ByteString].via(JsonProcessing.parallelJsonClassifier(4).async)
-
-  val produceTweetsFlow = Flow[StreamedTweetType].via(JsonProcessing.parallelTweetDecoder(4).async)
-
-  val headers = Auth.authorizationHeader(oauthConsumer, url)
+  val headers = Auth.authorizationHeader(url)
 
   val httpRequest: HttpRequest = HttpRequest(
     method = HttpMethods.GET,
     uri = source,
     headers = headers
   )
-
-  def countTypes(tweetType: StreamedTweetType): Unit = {
-    tweetType match {
-      case WarningEvent(_) => totalWarnings.incrementAndGet()
-      case SingleFieldEvent(_) => totalSingleEvents.incrementAndGet()
-      case Event(_) => totalOtherEvents.incrementAndGet()
-      case UnknownEvent(x) =>
-        println(x)
-        totalUnknownEvents.incrementAndGet()
-      case TweetEvent(_) => totalStandardTweets.incrementAndGet()
-    }
-  }
 
   val tweetsFlow = msgFlow(httpRequest)
                 .via(classifyTweetsFlow)
@@ -61,16 +34,26 @@ object TwitterStreamer extends App {
 
   val broadcastTweets = tweetsFlow.toMat(BroadcastHub.sink)(Keep.right).run()
 
+  broadcastTweets.runForeach(Stats.collectHashTags)
+  broadcastTweets.runForeach(Stats.collectLanguages)
+  broadcastTweets.runForeach(Stats.collectCountries)
+
   broadcastTweets.take(5000).runForeach(_ => ()).onComplete { done =>
     val end = System.nanoTime()
     println(s"Took: ${Duration.fromNanos(end - start).toSeconds} seconds")
-    println(s"Total messages processed ${totalMessages.get}")
-    println(s"Total warnings ${totalWarnings.get}")
-    println(s"Total other events ${totalOtherEvents.get}")
-    println(s"Total single field events ${totalSingleEvents.get}")
-    println(s"Total unknown events ${totalUnknownEvents.get}")
-    println(s"Total standard tweets events ${totalStandardTweets.get}")
-    println(s"Couldn't decode standard tweets events ${totalStandardTweets.get - 5000}")
+    println(s"Total messages processed ${totalMessages.count}")
+    println(s"Total warnings ${totalWarnings.count}")
+    println(s"Total other events ${totalOtherEvents.count}")
+    println(s"Total single field events ${totalSingleEvents.count}")
+    println(s"Total unknown events ${totalUnknownEvents.count}")
+    println(s"Total standard tweets events ${tweetsMeter.getCount}")
+    println(s"Couldn't decode standard tweets events ${tweetsMeter.getCount - 5000}")
+    println(s"Tweets per second: ${tweetsMeter.getMeanRate}")
+    println(s"Tweets per 5 minutes: ${tweetsMeter.getFifteenMinuteRate}")
+
+    println(s"Top Hashtags: ${Stats.top5HashTags.mkString(", ")}")
+    println(s"Top languages: ${Stats.top5Languages.mkString(", ")}")
+    println(s"Top countries: ${Stats.top5Countries.mkString(", ")}")
 
     system.terminate()
   }
@@ -81,33 +64,4 @@ object TwitterStreamer extends App {
 //    println(s"Total events processed ${totalMessages.get}")
 //  }
 
-  val totalMessages = new AtomicLong(0)
-  val totalWarnings = new AtomicLong(0)
-  val totalSingleEvents = new AtomicLong(0)
-  val totalOtherEvents = new AtomicLong(0)
-  val totalUnknownEvents = new AtomicLong(0)
-  val totalStandardTweets = new AtomicLong(0)
-
-  val start = System.nanoTime()
-
-  def msgFlow(httpRequest: HttpRequest) =
-    Source.single(httpRequest)
-    .via(connectionFlow)
-    .flatMapConcat {
-      case response if response.status.isSuccess() =>
-        response.entity.withoutSizeLimit().dataBytes
-      case other =>
-        println(s"Failed! $other")
-        Source.empty
-    }.via(Framing.delimiter(newline, Int.MaxValue))
-     .filter(_.nonEmpty)
-     .via(passThruInjection(() => totalMessages.incrementAndGet()))
-     .async
-
-  def passThruInjection[A](fn: () => Unit): Flow[A,A,NotUsed] = {
-    Flow[A].map { passThru =>
-      fn()
-      passThru
-    }
-  }
 }

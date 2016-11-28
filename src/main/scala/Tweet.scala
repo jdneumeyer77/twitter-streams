@@ -1,3 +1,14 @@
+import io.circe.Decoder
+import io.circe.generic.semiauto._
+
+object Tweet {
+	implicit val UrlsDecoder: Decoder[Url] = deriveDecoder[Url]
+	implicit val HashTagDecoder: Decoder[Hashtag] = deriveDecoder[Hashtag]
+	implicit val EntitiesDecoder: Decoder[Entities] = deriveDecoder[Entities]
+	implicit val PlaceDecoder: Decoder[Place] = deriveDecoder[Place]
+	implicit val TweetDecoder: Decoder[Tweet] = deriveDecoder[Tweet]
+}
+
 case class Tweet(
 	created_at: String,
 	entities: Entities,

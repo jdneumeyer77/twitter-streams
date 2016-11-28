@@ -9,12 +9,16 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.Duration
 
 object Auth {
+  import AkkaContext._
+
   private val consumerKey = "cGKbjjB6ZUZc81TQJWMNtJoUd"
   private val consumerSecret = "8H938MNsvMYHM79huL8l7rijNtSwczjLypubwzS8UKtp9KTtTL"
   private val accessToken = "4447624812-5riaoBA6VGYXLUtJYSsIbnCGdsoVo3MwUi5aOHK"
   private val accessTokenSecret = "42GTIaMCF5LqRJ7eDsrdyqutAlTELWJDcaxhfcxLiowKO"
 
-  def authorizationHeader(oauthConsumer: DefaultConsumerService, url: String)(implicit ec: ExecutionContext) = {
+  val oauthConsumer = new DefaultConsumerService(system.dispatcher)
+
+  def authorizationHeader(url: String)(implicit ec: ExecutionContext) = {
     val oauthHeader: Future[String] = oauthConsumer.createOauthenticatedRequest(
       KoauthRequest(
         method = "GET",
@@ -29,7 +33,7 @@ object Auth {
     ).map(_.header)
 
     oauthHeader.onFailure { case fail =>
-      println(s"Unable to obtain oauth header! Reason: \n $fail")
+      println(s"Unable to obtain oauth header! Exiting! Reason: \n $fail")
       System.exit(7)
     }
 

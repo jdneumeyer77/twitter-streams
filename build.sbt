@@ -11,5 +11,6 @@ libraryDependencies ++= Seq(
 	"com.hunorkovacs" %% "koauth" % "1.1.0", // no scala 2.12 support. :(
 	"de.knutwalker" %% "akka-stream-circe" % "3.1.0",
 	"de.knutwalker" %% "akka-http-circe" % "3.1.0",
-	"io.circe" %% "circe-generic" % "0.5.0"
+	"io.circe" %% "circe-generic" % "0.5.0",
+  "nl.grons" %% "metrics-scala" % "3.5.5_a2.3"
 )
