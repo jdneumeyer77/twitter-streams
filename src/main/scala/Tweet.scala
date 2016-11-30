@@ -2,11 +2,12 @@ import io.circe.Decoder
 import io.circe.generic.semiauto._
 
 object Tweet {
-	implicit val UrlsDecoder: Decoder[Url] = deriveDecoder[Url]
-	implicit val HashTagDecoder: Decoder[Hashtag] = deriveDecoder[Hashtag]
-	implicit val EntitiesDecoder: Decoder[Entities] = deriveDecoder[Entities]
-	implicit val PlaceDecoder: Decoder[Place] = deriveDecoder[Place]
-	implicit val TweetDecoder: Decoder[Tweet] = deriveDecoder[Tweet]
+	implicit val UrlsDecoder: Decoder[Url] = deriveDecoder
+	implicit val MediaDecoder: Decoder[Media] = deriveDecoder
+	implicit val HashTagDecoder: Decoder[Hashtag] = deriveDecoder
+	implicit val EntitiesDecoder: Decoder[Entities] = deriveDecoder
+	implicit val PlaceDecoder: Decoder[Place] = deriveDecoder
+	implicit val TweetDecoder: Decoder[Tweet] = deriveDecoder
 }
 
 case class Tweet(
@@ -21,13 +22,9 @@ case class Tweet(
 	text: String
 )
 
-case class Place(
-	country_code: String,
-	full_name: Option[String],
-	name: Option[String]
-)
+case class Place(country_code: String)
 
-case class Entities(hashtags: Seq[Hashtag],
-										urls: Seq[Url])
+case class Entities(hashtags: Seq[Hashtag], urls: Seq[Url], media: Option[Seq[Media]])
+case class Media(display_url: String)
 case class Hashtag(text: String)
 case class Url(expanded_url: Option[String])

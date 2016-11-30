@@ -13,4 +13,5 @@ libraryDependencies ++= Seq(
 	"de.knutwalker" %% "akka-http-circe" % "3.1.0",
 	"io.circe" %% "circe-generic" % "0.5.0",
   "nl.grons" %% "metrics-scala" % "3.5.5_a2.3"
+
 )

@@ -1,8 +1,11 @@
+import java.io.File
 import java.lang.Math._
 
+import cats.data.Xor
 import com.codahale.metrics.{Meter => DWMeter}
 
 import scala.collection.concurrent.TrieMap
+import scala.util.Success
 
 
 object meter {
@@ -35,6 +38,7 @@ object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
   val totalSingleEvents = metrics.counter("total-single-events")
   val totalOtherEvents = metrics.counter("total-other-events")
   val totalUnknownEvents = metrics.counter("total-unknown-events")
+  val totalTweetsEmojis = metrics.counter("total-tweets-with-emojis")
   val tweetsMeter = meter.meter
 
   val start = System.nanoTime()
@@ -75,4 +79,64 @@ object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
   }
 
   def top5Countries: Seq[String] = top(countries)
+
+  def top5Emojis: Seq[String] = top(emojis)
+
+  private val emojis = new TrieMap[String,Long]()
+  def collectEmojis(emojiData: Map[String,String])(tweet: Tweet): Unit = {
+    val found  = tweet.text.foldLeft(false) {
+      case (emojiFound, char) =>
+        emojiData.get(char.toString) match {
+          case Some(shortname) =>
+            emojis.addOrIncr(shortname)
+            true
+          case None => emojiFound
+        }
+    }
+
+    if(found) totalTweetsEmojis.inc()
+  }
+
+  // convert hex string to utf-16 string.
+  private def hexStringToUnicode(hexStrings: String): String = {
+    val ints = hexStrings.split('-').map(x => Integer.parseInt(x, 16))
+
+    new String(ints, 0, ints.length)
+  }
+
+  def readEmojiData(name: String): Map[String,String] = {
+    val file = new File(name)
+    if(!file.exists()) {
+      println(s"Couldn't open $name! Tried the follow path: ${file.getAbsolutePath}")
+      Map.empty[String,String]
+    } else {
+      import io.circe.generic.semiauto._
+
+      implicit val emojiDecoder = deriveDecoder[EmojiEntry]
+
+      io.circe.jawn.CirceSupportParser.parseFromFile(file).map { x =>
+        x.as[List[EmojiEntry]]
+      } match {
+        case Success(Xor.Right(emojisDecoded)) =>
+          println(s"collecting emoji data. ${emojisDecoded.size}")
+          emojisDecoded.foldLeft(Map.newBuilder[String,String]) {
+            case (acc, emoji) =>
+              acc += hexStringToUnicode(emoji.unified) -> emoji.short_name
+              emoji.au.foreach(hex => acc += hexStringToUnicode(hex) -> emoji.short_name)
+              emoji.google.foreach(hex => acc += hexStringToUnicode(hex) -> emoji.short_name)
+              emoji.docomo.foreach(hex => acc += hexStringToUnicode(hex) -> emoji.short_name)
+              emoji.softbank.foreach(hex => acc += hexStringToUnicode(hex) -> emoji.short_name)
+              acc
+          }.result()
+        case fail =>
+          println(s"failed to parse emojis: $fail")
+          Map.empty[String,String]
+      }
+    }
+
+  }
+
+  case class EmojiEntry(unified: String, docomo: Option[String],
+                        au: Option[String], softbank: Option[String],
+                        google: Option[String], short_name: String)
 }

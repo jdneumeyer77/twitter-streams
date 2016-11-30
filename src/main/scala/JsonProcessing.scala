@@ -50,11 +50,7 @@ trait JsonProcessing {
   private def decodeTweet(implicit decoder: Decoder[Tweet]): Flow[StreamedTweetType, Tweet, NotUsed] = {
     Flow[StreamedTweetType].collect {
       case TweetEvent(json) => decoder.decodeJson(json)
-    }.map { x =>
-      x.leftMap(x => println(x.toString()))
-      x
-    }
-      .collect {
+    }.collect {
       case Xor.Right(tweet) => tweet
     }
   }
