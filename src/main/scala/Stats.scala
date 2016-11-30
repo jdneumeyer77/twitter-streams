@@ -98,10 +98,15 @@ object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
   }
 
   // convert hex string to utf-16 string.
-  private def hexStringToUnicode(hexStrings: String): String = {
-    val ints = hexStrings.split('-').map(x => Integer.parseInt(x, 16))
-
-    new String(ints, 0, ints.length)
+  private def hexStringToUnicode(hexStrings: String): Option[String] = {
+    try {
+      val ints = hexStrings.split('-').map(x => Integer.parseInt(x, 16))
+      Some(new String(ints, 0, ints.length))
+    } catch {
+      case e: Throwable =>
+        println(s"Failed to convert to $hexStrings to string. reason: ${e.getCause}")
+        None
+    }
   }
 
   def readEmojiData(name: String): Map[String,String] = {
@@ -121,11 +126,12 @@ object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
           println(s"collecting emoji data. ${emojisDecoded.size}")
           emojisDecoded.foldLeft(Map.newBuilder[String,String]) {
             case (acc, emoji) =>
-              acc += hexStringToUnicode(emoji.unified) -> emoji.short_name
-              emoji.au.foreach(hex => acc += hexStringToUnicode(hex) -> emoji.short_name)
-              emoji.google.foreach(hex => acc += hexStringToUnicode(hex) -> emoji.short_name)
-              emoji.docomo.foreach(hex => acc += hexStringToUnicode(hex) -> emoji.short_name)
-              emoji.softbank.foreach(hex => acc += hexStringToUnicode(hex) -> emoji.short_name)
+              hexStringToUnicode(emoji.unified).foreach(emojiUnified => acc += emojiUnified -> emoji.short_name)
+              Seq[Option[String]](emoji.au, emoji.google, emoji.docomo, emoji.softbank)
+                .flatten
+                .flatMap(hexStringToUnicode)
+                .foreach(emojiSymbol => acc += emojiSymbol -> emoji.short_name)
+
               acc
           }.result()
         case fail =>
