@@ -1,5 +1,6 @@
 import java.io.File
 import java.lang.Math._
+import java.net.URL
 
 import cats.data.Xor
 import com.codahale.metrics.{Meter => DWMeter}
@@ -9,11 +10,13 @@ import scala.util.Success
 
 
 object meter {
+  // Needed for EWMA.
   private val INTERVAL: Int = 5
   private val SECONDS_PER_MINUTE: Double = 60.0
   private val SIXTY_MINUTES = 60
   private val M60_ALPHA: Double = 1 - exp(-INTERVAL / SECONDS_PER_MINUTE / SIXTY_MINUTES)
 
+  // a bit hack-y since everything is marked private...
   class CustomMeter extends DWMeter {
     import java.util.concurrent.TimeUnit
     private val m60 = new com.codahale.metrics.EWMA(M60_ALPHA, INTERVAL, TimeUnit.SECONDS)
@@ -23,7 +26,7 @@ object meter {
       m60.update(n)
     }
 
-    def get60MinuteRate() = m60.getRate(TimeUnit.SECONDS)
+    def getSixtyMinuteRate() = m60.getRate(TimeUnit.SECONDS)
   }
 
   def meter: CustomMeter = new CustomMeter
@@ -39,6 +42,8 @@ object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
   val totalOtherEvents = metrics.counter("total-other-events")
   val totalUnknownEvents = metrics.counter("total-unknown-events")
   val totalTweetsEmojis = metrics.counter("total-tweets-with-emojis")
+  val totalTweetsUrls = metrics.counter("total-tweets-with-a-url")
+  val totalTweetsPhotos = metrics.counter("total-tweets-with-a-photo")
   val tweetsMeter = meter.meter
 
   val start = System.nanoTime()
@@ -53,12 +58,44 @@ object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
     }
   }
 
+  def percentOfTweets(comparedTo: Long): Double = {
+    (comparedTo.toDouble / tweetsMeter.getCount) * 100.0
+  }
+
+  private val noItems = Seq("No top items to display (map was empty)!")
   private def top(map: TrieMap[String,Long], count: Int = 5) = {
-    map.top(5).map {
-      case (key, count) => s"$key: $count"
+    if(map.nonEmpty) {
+      map.top(5).map {
+        case (key, count) => s"$key: $count"
+      }
+    } else noItems
+  }
+
+  //// media
+  private val photoDomains = Vector("pic.twitter", "instagram", "imgur")
+  def collectPhotoUrls(tweet: Tweet): Unit = {
+    val containsPhotoUrl_? = tweet.entities.media.exists { media =>
+      media.exists(m => photoDomains.contains(m.display_url))
+    }
+
+    if(containsPhotoUrl_?) totalTweetsPhotos.inc()
+  }
+
+  //// urls
+  private val urlHostnames = new TrieMap[String,Long]()
+  def collectUrls(tweet: Tweet): Unit = {
+    if(tweet.entities.urls.nonEmpty) {
+      totalTweetsUrls.inc()
+      tweet.entities.urls.collect {
+        case Url(Some(url)) =>
+          new URL(url).getHost
+      }.foreach(urlHostnames.addOrIncr)
     }
   }
 
+  def top5Urls = top(urlHostnames)
+
+  //// hashtags
   private val hashTags = new TrieMap[String,Long]()
   def collectHashTags(tweet: Tweet): Unit = {
     tweet.entities.hashtags.foreach(tag => hashTags.addOrIncr(tag.text))
@@ -66,6 +103,8 @@ object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
 
   def top5HashTags: Seq[String] = top(hashTags)
 
+
+  //// languages
   private val languages = new TrieMap[String,Long]()
   def collectLanguages(tweet: Tweet): Unit = {
     tweet.lang.foreach(languages.addOrIncr)
@@ -73,6 +112,7 @@ object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
 
   def top5Languages: Seq[String] = top(languages)
 
+  //// countires
   private val countries = new TrieMap[String,Long]()
   def collectCountries(tweet: Tweet): Unit = {
     tweet.place.foreach(country => countries.addOrIncr(country.country_code))
@@ -80,6 +120,7 @@ object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
 
   def top5Countries: Seq[String] = top(countries)
 
+  //// emojis
   def top5Emojis: Seq[String] = top(emojis)
 
   private val emojis = new TrieMap[String,Long]()

@@ -8,7 +8,7 @@ import akka.stream.scaladsl._
 import cats.data.Xor
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 import scala.util.{Success, Try}
 
 object AkkaContext {
@@ -50,29 +50,46 @@ object TwitterStreamer extends App {
 
   if(emojData.nonEmpty) broadcastTweets.runForeach(Stats.collectEmojis(emojData))
 
-  broadcastTweets.take(5000).runForeach(_ => ()).onComplete { done =>
+  system.scheduler.schedule(1 minutes, 3 minutes) {
+    displayStats()
+  }
+
+  Console.in.readLine()
+
+  stopStream()
+
+  displayTotalStats()
+  displayStats()
+
+  system.terminate()
+
+  def displayTotalStats(): Unit = {
     val end = System.nanoTime()
-    println(s"Took: ${Duration.fromNanos(end - start).toSeconds} seconds")
+    println("Finish stats:")
+    println(s"Runtime: ${Duration.fromNanos(end - start).toSeconds} seconds")
     println(s"Total messages processed ${totalMessages.count}")
     println(s"Total warnings ${totalWarnings.count}")
     println(s"Total other events ${totalOtherEvents.count}")
     println(s"Total single field events ${totalSingleEvents.count}")
     println(s"Total unknown events ${totalUnknownEvents.count}")
     println(s"Total standard tweets events ${tweetsMeter.getCount}")
-    println(s"Couldn't decode standard tweets events ${tweetsMeter.getCount - 5000}")
+  }
+
+  def displayStats(): Unit = {
     println(s"Tweets per second: ${tweetsMeter.getMeanRate}")
     println(s"Average tweets per second in the 1 minute: ${tweetsMeter.getOneMinuteRate()}")
     println(s"Average tweets per second in the 15 minutes: ${tweetsMeter.getFifteenMinuteRate()}")
-    println(s"Average tweets per second in the last hour: ${tweetsMeter.get60MinuteRate()}")
+    println(s"Average tweets per second in the last hour: ${tweetsMeter.getSixtyMinuteRate()}")
 
-    println(s"Percent of tweets with emojis (${totalTweetsEmojis.count}): ${(totalTweetsEmojis.count.toDouble / tweetsMeter.getCount) * 100.0}")
-
+    println(s"Percent of tweets with emojis (${totalTweetsEmojis.count}): ${percentOfTweets(totalTweetsEmojis.count)}")
+    println(s"Percent of tweets with urls (${totalTweetsUrls.count}): ${percentOfTweets(totalTweetsUrls.count)}")
+    println(s"Percent of tweets with photos (${totalTweetsPhotos.count}): ${percentOfTweets(totalTweetsPhotos.count)}")
 
     println(s"Top Hashtags: ${Stats.top5HashTags.mkString(", ")}")
     println(s"Top languages: ${Stats.top5Languages.mkString(", ")}")
     println(s"Top countries: ${Stats.top5Countries.mkString(", ")}")
     println(s"Top emojis: ${Stats.top5Emojis.mkString(", ")}")
-
-    system.terminate()
+    println(s"Top urls: ${Stats.top5Urls.mkString(", ")}")
   }
+
 }
