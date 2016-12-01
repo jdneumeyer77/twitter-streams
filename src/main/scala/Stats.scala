@@ -1,9 +1,11 @@
 import java.io.File
 import java.lang.Math._
 import java.net.URL
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.{AtomicLong, LongAdder}
 
 import cats.data.Xor
-import com.codahale.metrics.{Meter => DWMeter}
+import com.codahale.metrics.{Clock, EWMA}
 
 import scala.collection.concurrent.TrieMap
 import scala.util.Success
@@ -15,18 +17,63 @@ object meter {
   private val SECONDS_PER_MINUTE: Double = 60.0
   private val SIXTY_MINUTES = 60
   private val M60_ALPHA: Double = 1 - exp(-INTERVAL / SECONDS_PER_MINUTE / SIXTY_MINUTES)
+  private val TICK_INTERVAL: Long = TimeUnit.SECONDS.toNanos(INTERVAL)
 
-  // a bit hack-y since everything is marked private...
-  class CustomMeter extends DWMeter {
+  // Based on Dropwizard's meter, but it wasn't fit to be extended...
+  class CustomMeter {
     import java.util.concurrent.TimeUnit
-    private val m60 = new com.codahale.metrics.EWMA(M60_ALPHA, INTERVAL, TimeUnit.SECONDS)
+    private val m1Rate: EWMA = EWMA.oneMinuteEWMA
+    private val m60Rate = new com.codahale.metrics.EWMA(M60_ALPHA, INTERVAL, TimeUnit.SECONDS)
 
-    override def mark(n: Long): Unit = {
-      super.mark(n)
-      m60.update(n)
+    private val counter = new LongAdder()
+    private val clock = Clock.defaultClock()
+    private val startTime = clock.getTick
+    private val lastTick = new AtomicLong(startTime)
+
+    def mark(): Unit = {
+      mark(1)
     }
 
-    def getSixtyMinuteRate() = m60.getRate(TimeUnit.SECONDS)
+    def mark(n: Long): Unit = {
+      tickIfNecessary()
+      counter.add(n)
+      m1Rate.update(n)
+      m60Rate.update(n)
+    }
+
+    private def tickIfNecessary() {
+      val oldTick = lastTick.get
+      val newTick = clock.getTick
+      val age = newTick - oldTick
+      if (age > TICK_INTERVAL) {
+        val newIntervalStartTick = newTick - age % TICK_INTERVAL
+        if (lastTick.compareAndSet(oldTick, newIntervalStartTick)) {
+          val requiredTicks: Long = age / TICK_INTERVAL
+          (0L until requiredTicks).foreach { _ =>
+            m1Rate.tick()
+            m60Rate.tick()
+          }
+        }
+      }
+    }
+
+    def sixtyMinuteRate() = {
+      tickIfNecessary()
+      m60Rate.getRate(TimeUnit.SECONDS)
+    }
+
+    def oneMinuteRate() = {
+      tickIfNecessary()
+      m1Rate.getRate(TimeUnit.SECONDS)
+    }
+
+    def count = counter.sum()
+
+    def meanRate = if (count == 0) 0.0
+    else {
+      val elapsed: Double = clock.getTick - startTime
+      count / elapsed * TimeUnit.SECONDS.toNanos(1)
+    }
   }
 
   def meter: CustomMeter = new CustomMeter
@@ -59,7 +106,7 @@ object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
   }
 
   def percentOfTweets(comparedTo: Long): Double = {
-    (comparedTo.toDouble / tweetsMeter.getCount) * 100.0
+    (comparedTo.toDouble / tweetsMeter.count) * 100.0
   }
 
   private val noItems = Seq("No top items to display (map was empty)!")
