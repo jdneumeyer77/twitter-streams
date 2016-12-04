@@ -45,7 +45,7 @@ object TwitterStreamer extends App {
 
   if(emojData.nonEmpty) broadcastTweets.runForeach(Stats.collectEmojis(emojData))
 
-  system.scheduler.schedule(1 minutes, 3 minutes) {
+  system.scheduler.schedule(1.minutes, 3.minutes) {
     displayStats()
   }
 
@@ -60,8 +60,9 @@ object TwitterStreamer extends App {
 
   def displayTotalStats(): Unit = {
     val end = System.nanoTime()
+    println("=" * 20)
     println("Finish stats:")
-    println(s"Runtime: ${Duration.fromNanos(end - start).toSeconds} seconds")
+    println(s"Runtime: ${Duration.fromNanos(end - start).toMinutes} minutes")
     println(s"Total messages processed ${totalMessages.count}")
     println(s"Total warnings ${totalWarnings.count}")
     println(s"Total other events ${totalOtherEvents.count}")

@@ -25,6 +25,6 @@ case class Tweet(
 case class Place(country_code: String)
 
 case class Entities(hashtags: Seq[Hashtag], urls: Seq[Url], media: Option[Seq[Media]])
-case class Media(display_url: String)
+case class Media(expanded_url: String)
 case class Hashtag(text: String)
-case class Url(expanded_url: Option[String])
+case class Url(expanded_url: String)

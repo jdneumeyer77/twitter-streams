@@ -1,84 +1,9 @@
 import java.io.File
-import java.lang.Math._
-import java.net.URL
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.{AtomicLong, LongAdder}
 
 import cats.data.Xor
-import com.codahale.metrics.{Clock, EWMA}
 
 import scala.collection.concurrent.TrieMap
 import scala.util.Success
-
-
-object meter {
-  // Needed for EWMA.
-  private val INTERVAL: Int = 5
-  private val SECONDS_PER_MINUTE: Double = 60.0
-  private val SIXTY_MINUTES = 60
-  private val M60_ALPHA: Double = 1 - exp(-INTERVAL / SECONDS_PER_MINUTE / SIXTY_MINUTES)
-  private val TICK_INTERVAL: Long = TimeUnit.SECONDS.toNanos(INTERVAL)
-
-  // Based on Dropwizard's meter, but it wasn't fit to be extended...
-  class CustomMeter {
-    import java.util.concurrent.TimeUnit
-    private val m1Rate: EWMA = EWMA.oneMinuteEWMA
-    private val m60Rate = new com.codahale.metrics.EWMA(M60_ALPHA, INTERVAL, TimeUnit.SECONDS)
-
-    private val counter = new LongAdder()
-    private val clock = Clock.defaultClock()
-    private val startTime = clock.getTick
-    private val lastTick = new AtomicLong(startTime)
-
-    def mark(): Unit = {
-      mark(1)
-    }
-
-    def mark(n: Long): Unit = {
-      tickIfNecessary()
-      counter.add(n)
-      m1Rate.update(n)
-      m60Rate.update(n)
-    }
-
-    private def tickIfNecessary() {
-      val oldTick = lastTick.get
-      val newTick = clock.getTick
-      val age = newTick - oldTick
-      if (age > TICK_INTERVAL) {
-        val newIntervalStartTick = newTick - age % TICK_INTERVAL
-        if (lastTick.compareAndSet(oldTick, newIntervalStartTick)) {
-          val requiredTicks: Long = age / TICK_INTERVAL
-          (0L until requiredTicks).foreach { _ =>
-            m1Rate.tick()
-            m60Rate.tick()
-          }
-        }
-      }
-    }
-
-    def sixtyMinuteRate() = {
-      tickIfNecessary()
-      m60Rate.getRate(TimeUnit.SECONDS)
-    }
-
-    def oneMinuteRate() = {
-      tickIfNecessary()
-      m1Rate.getRate(TimeUnit.SECONDS)
-    }
-
-    def count = counter.sum()
-
-    def meanRate = if (count == 0) 0.0
-    else {
-      val elapsed: Double = clock.getTick - startTime
-      count / elapsed * TimeUnit.SECONDS.toNanos(1)
-    }
-  }
-
-  def meter: CustomMeter = new CustomMeter
-}
-
 
 object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
   import Utils._
@@ -91,7 +16,7 @@ object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
   val totalTweetsEmojis = metrics.counter("total-tweets-with-emojis")
   val totalTweetsUrls = metrics.counter("total-tweets-with-a-url")
   val totalTweetsPhotos = metrics.counter("total-tweets-with-a-photo")
-  val tweetsMeter = meter.meter
+  val tweetsMeter = Metrics.meter
 
   val start = System.nanoTime()
 
@@ -119,10 +44,12 @@ object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
   }
 
   //// media
-  private val photoDomains = Vector("pic.twitter", "instagram", "imgur")
+  private val photoDomains = Array("pic.twitter", "instagram", "imgur")
   def collectPhotoUrls(tweet: Tweet): Unit = {
     val containsPhotoUrl_? = tweet.entities.media.exists { media =>
-      media.exists(m => photoDomains.contains(m.display_url))
+      media.exists { photo =>
+        domainFrom(photo.expanded_url).map(photoDomains.contains).getOrElse(false)
+      }
     }
 
     if(containsPhotoUrl_?) totalTweetsPhotos.inc()
@@ -133,10 +60,10 @@ object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
   def collectUrls(tweet: Tweet): Unit = {
     if(tweet.entities.urls.nonEmpty) {
       totalTweetsUrls.inc()
-      tweet.entities.urls.collect {
-        case Url(Some(url)) =>
-          new URL(url).getHost
-      }.foreach(urlHostnames.addOrIncr)
+      tweet.entities.urls.foreach {
+        case Url(expanded_url) =>
+          domainFrom(expanded_url).foreach(urlHostnames.addOrIncr)
+      }
     }
   }
 

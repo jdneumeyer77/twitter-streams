@@ -3,7 +3,7 @@ import akka.NotUsed
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpRequest, Uri}
 import akka.stream.KillSwitches
-import akka.stream.scaladsl.{Flow, Framing, Keep, Source}
+import akka.stream.scaladsl.{Flow, Framing, Source}
 import akka.util.ByteString
 
 object Flows {

@@ -1,4 +1,7 @@
+import java.net.URL
+
 import scala.collection.concurrent.TrieMap
+import scala.util.Try
 
 object Utils {
   private val reverseLongOrdering = Ordering.Long.reverse
@@ -19,5 +22,9 @@ object Utils {
     def top(n: Int) = {
       map.readOnlySnapshot().toVector.sortBy(_._2)(reverseLongOrdering).take(n)
     }
+  }
+
+  def domainFrom(expandedUrl: String): Try[String] = {
+    Try(new URL(expandedUrl.replace("""\""", "")).getHost.toLowerCase)
   }
 }
