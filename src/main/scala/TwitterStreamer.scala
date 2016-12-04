@@ -20,7 +20,7 @@ object TwitterStreamer extends App {
   private val url = "https://stream.twitter.com/1.1/statuses/sample.json"
   private val source = Uri(url)
 
-  val emojData = readEmojiData(emojiFile)
+  val emojData = Stats.Emojis.readData(emojiFile)
 
   println(s"emoji data dictionary size: ${emojData.size}")
 
@@ -39,11 +39,13 @@ object TwitterStreamer extends App {
 
   val broadcastTweets = tweetsFlow.toMat(BroadcastHub.sink)(Keep.right).run()
 
-  broadcastTweets.runForeach(Stats.collectHashTags)
-  broadcastTweets.runForeach(Stats.collectLanguages)
-  broadcastTweets.runForeach(Stats.collectCountries)
-
-  if(emojData.nonEmpty) broadcastTweets.runForeach(Stats.collectEmojis(emojData))
+  // stats collection
+  broadcastTweets.runForeach(Stats.Hashtags.collect)
+  broadcastTweets.runForeach(Stats.Languages.collect)
+  broadcastTweets.runForeach(Stats.Countries.collect)
+  broadcastTweets.runForeach(Stats.Urls.collect)
+  broadcastTweets.runForeach(Stats.Photos.collect)
+  if(emojData.nonEmpty) broadcastTweets.runForeach(Stats.Emojis.collect(emojData))
 
   system.scheduler.schedule(1.minutes, 3.minutes) {
     displayStats()
@@ -77,14 +79,14 @@ object TwitterStreamer extends App {
     println(s"Average tweets per second in the last hour: ${tweetsMeter.sixtyMinuteRate()}")
 
     println(s"Percent of tweets with emojis (${totalTweetsEmojis.count}): ${percentOfTweets(totalTweetsEmojis.count)}")
-    println(s"Percent of tweets with urls (${totalTweetsUrls.count}): ${percentOfTweets(totalTweetsUrls.count)}")
-    println(s"Percent of tweets with photos (${totalTweetsPhotos.count}): ${percentOfTweets(totalTweetsPhotos.count)}")
+    println(s"Percent of tweets with urls (${Stats.Urls.total.count}): ${percentOfTweets(Stats.Urls.total.count)}")
+    println(s"Percent of tweets with photos (${Stats.Photos.total.count}): ${percentOfTweets(Stats.Photos.total.count)}")
 
-    println(s"Top Hashtags: ${Stats.top5HashTags.mkString(", ")}")
-    println(s"Top languages: ${Stats.top5Languages.mkString(", ")}")
-    println(s"Top countries: ${Stats.top5Countries.mkString(", ")}")
-    println(s"Top emojis: ${Stats.top5Emojis.mkString(", ")}")
-    println(s"Top urls: ${Stats.top5Urls.mkString(", ")}")
+    println(s"Top Hashtags: ${Stats.Hashtags.top().mkString(", ")}")
+    println(s"Top languages: ${Stats.Languages.top().mkString(", ")}")
+    println(s"Top countries: ${Stats.Countries.top().mkString(", ")}")
+    println(s"Top emojis: ${Stats.Emojis.top().mkString(", ")}")
+    println(s"Top urls: ${Stats.Urls.top().mkString(", ")}")
   }
 
 }

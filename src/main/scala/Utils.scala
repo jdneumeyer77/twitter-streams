@@ -1,4 +1,5 @@
 import java.net.URL
+import java.util.regex.Pattern
 
 import scala.collection.concurrent.TrieMap
 import scala.util.Try
@@ -24,7 +25,8 @@ object Utils {
     }
   }
 
+  private val simpleUnexscape = Pattern.compile("""\""", Pattern.LITERAL)
   def domainFrom(expandedUrl: String): Try[String] = {
-    Try(new URL(expandedUrl.replace("""\""", "")).getHost.toLowerCase)
+    Try(new URL(simpleUnexscape.matcher(expandedUrl).replaceAll("")).getHost.toLowerCase)
   }
 }
