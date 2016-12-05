@@ -6,4 +6,4 @@ You have to put your Twitter App credentials in `Auth.scala`
 
 Running:
 
-```activator run```
+```activator run``` or ```sbt run```
