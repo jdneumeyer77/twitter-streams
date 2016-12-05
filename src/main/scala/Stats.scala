@@ -8,7 +8,6 @@ import scala.util.Success
 
 // TODO: make a StatsSnapshot object
 // TODO: Use that for snapshot reports.
-// TODO: Add tests for some utility functions
 trait TopStatsCollector {
   import Utils._
   val data = TrieMap[String,Long]()
@@ -137,7 +136,7 @@ object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
           x.as[List[EmojiEntry]]
         } match {
           case Success(Xor.Right(emojisDecoded)) =>
-            println(s"collecting emoji data. ${emojisDecoded.size}")
+            println(s"collected emoji data: ${emojisDecoded.size}")
             emojisDecoded.foldLeft(Map.newBuilder[String, String]) {
               case (acc, emoji) =>
                 hexStringToUnicode(emoji.unified).foreach(emojiUnified => acc += emojiUnified -> emoji.short_name)
@@ -161,7 +160,8 @@ object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
                           google: Option[String], short_name: String)
   }
 
-
+  // TODO: This would generate stat snapshots that could be displayed,
+  // transformed to json, or stored in a DB.
   object Reporter {
     def displayFinalStats(): Unit = {
       val end = System.nanoTime()

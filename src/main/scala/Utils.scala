@@ -15,7 +15,7 @@ object Utils {
        }
     }
 
-    def valueOf(key: String) = {
+    def countOf(key: String) = {
       map.getOrElse(key.toLowerCase, -1L)
     }
 

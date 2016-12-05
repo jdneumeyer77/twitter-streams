@@ -62,9 +62,8 @@ trait JsonProcessing {
     else if(obj.exists(jsonHasFields("event"))) Event(json)
     else if(obj.exists(_.size == 1)) SingleFieldEvent(json)
     else if(obj.exists(jsonHasFields("id_str", "text", "entities"))) TweetEvent(json) // likely...
-    else {
-      UnknownEvent(json)
-    }
+    else UnknownEvent(json)
+
   }
 
   def jsonHasFields(fields: String*)(json: JsonObject): Boolean = {

@@ -30,6 +30,7 @@ object TwitterStreamer extends App {
     headers = headers
   )
 
+  // TODO: Nice to split 4-ways with classifier.
   val tweetsFlow = msgFlow(httpRequest)
                 .via(classifyTweetsFlow)
                 .alsoTo(Sink.foreach(countTypes))
@@ -45,6 +46,8 @@ object TwitterStreamer extends App {
   broadcastTweets.runForeach(Stats.Photos.collect)
   if(emojData.nonEmpty) broadcastTweets.runForeach(Stats.Emojis.collect(emojData))
 
+  // TODO: Switch to Sink.tick (and produce a stats snapshot).
+  // Then it can be push to a DB or whatever periodically.
   system.scheduler.schedule(1.minutes, 3.minutes) {
     Reporter.displayStats(true)
   }
