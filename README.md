@@ -1,11 +1,9 @@
-# akka-sample-twitter-streaming
-
-This is a working example of Twitter Streaming API client application using `akka-http` and `akka-stream`.
+# Twitter Akka Streams
 
 ## Usage
 
-You have to put your Twitter App credentials in `TwitterStreamer.scala` 
+You have to put your Twitter App credentials in `Auth.scala`
 
 Running:
 
-```sbt run```
+```activator run```
