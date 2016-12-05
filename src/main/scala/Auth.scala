@@ -11,10 +11,10 @@ import scala.concurrent.duration.Duration
 object Auth {
   import AkkaContext._
 
-  private val consumerKey = "cGKbjjB6ZUZc81TQJWMNtJoUd"
-  private val consumerSecret = "8H938MNsvMYHM79huL8l7rijNtSwczjLypubwzS8UKtp9KTtTL"
-  private val accessToken = "4447624812-5riaoBA6VGYXLUtJYSsIbnCGdsoVo3MwUi5aOHK"
-  private val accessTokenSecret = "42GTIaMCF5LqRJ7eDsrdyqutAlTELWJDcaxhfcxLiowKO"
+  private val consumerKey = ""
+  private val consumerSecret = ""
+  private val accessToken = ""
+  private val accessTokenSecret = ""
 
   val oauthConsumer = new DefaultConsumerService(system.dispatcher)
 
