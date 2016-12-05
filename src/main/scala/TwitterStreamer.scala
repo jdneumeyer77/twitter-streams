@@ -22,8 +22,6 @@ object TwitterStreamer extends App {
 
   val emojData = Stats.Emojis.readData(emojiFile)
 
-  println(s"emoji data dictionary size: ${emojData.size}")
-
   val headers = Auth.authorizationHeader(url)
 
   val httpRequest: HttpRequest = HttpRequest(
@@ -48,45 +46,16 @@ object TwitterStreamer extends App {
   if(emojData.nonEmpty) broadcastTweets.runForeach(Stats.Emojis.collect(emojData))
 
   system.scheduler.schedule(1.minutes, 3.minutes) {
-    displayStats()
+    Reporter.displayStats(true)
   }
 
+  println("Press enter to stop application, and display final statistics.")
   Console.in.readLine()
 
   stopStream()
 
-  displayTotalStats()
-  displayStats()
+  Reporter.displayFinalStats()
+  Reporter.displayStats(false)
 
   system.terminate()
-
-  def displayTotalStats(): Unit = {
-    val end = System.nanoTime()
-    println("=" * 20)
-    println("Finish stats:")
-    println(s"Runtime: ${Duration.fromNanos(end - start).toMinutes} minutes")
-    println(s"Total messages processed ${totalMessages.count}")
-    println(s"Total warnings ${totalWarnings.count}")
-    println(s"Total other events ${totalOtherEvents.count}")
-    println(s"Total single field events ${totalSingleEvents.count}")
-    println(s"Total unknown events ${totalUnknownEvents.count}")
-    println(s"Total standard tweets events ${tweetsMeter.count}")
-  }
-
-  def displayStats(): Unit = {
-    println(s"Tweets per second: ${tweetsMeter.meanRate}")
-    println(s"Average tweets per second in the 1 minute: ${tweetsMeter.oneMinuteRate()}")
-    println(s"Average tweets per second in the last hour: ${tweetsMeter.sixtyMinuteRate()}")
-
-    println(s"Percent of tweets with emojis (${totalTweetsEmojis.count}): ${percentOfTweets(totalTweetsEmojis.count)}")
-    println(s"Percent of tweets with urls (${Stats.Urls.total.count}): ${percentOfTweets(Stats.Urls.total.count)}")
-    println(s"Percent of tweets with photos (${Stats.Photos.total.count}): ${percentOfTweets(Stats.Photos.total.count)}")
-
-    println(s"Top Hashtags: ${Stats.Hashtags.top().mkString(", ")}")
-    println(s"Top languages: ${Stats.Languages.top().mkString(", ")}")
-    println(s"Top countries: ${Stats.Countries.top().mkString(", ")}")
-    println(s"Top emojis: ${Stats.Emojis.top().mkString(", ")}")
-    println(s"Top urls: ${Stats.Urls.top().mkString(", ")}")
-  }
-
 }

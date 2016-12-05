@@ -1,15 +1,14 @@
 import java.io.File
-import java.util.regex.Pattern
 
 import cats.data.Xor
 
 import scala.collection.concurrent.TrieMap
+import scala.concurrent.duration.Duration
 import scala.util.Success
 
 // TODO: make a StatsSnapshot object
 // TODO: Use that for snapshot reports.
 // TODO: Add tests for some utility functions
-
 trait TopStatsCollector {
   import Utils._
   val data = TrieMap[String,Long]()
@@ -150,7 +149,7 @@ object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
                 acc
             }.result()
           case fail =>
-            println(s"failed to parse emojis: $fail")
+            println(s"Failed to parse emojis: $fail")
             Map.empty[String, String]
         }
       }
@@ -160,6 +159,42 @@ object Stats extends nl.grons.metrics.scala.DefaultInstrumented {
     case class EmojiEntry(unified: String, docomo: Option[String],
                           au: Option[String], softbank: Option[String],
                           google: Option[String], short_name: String)
+  }
+
+
+  object Reporter {
+    def displayFinalStats(): Unit = {
+      val end = System.nanoTime()
+      println("=" * 20)
+      println("Final stats:")
+      println(s"Runtime: ${Duration.fromNanos(end - start).toMinutes} minutes")
+      println(s"Total messages processed ${totalMessages.count}")
+      println(s"Total warnings ${totalWarnings.count}")
+      println(s"Total other events ${totalOtherEvents.count}")
+      println(s"Total single field events ${totalSingleEvents.count}")
+      println(s"Total unknown events ${totalUnknownEvents.count}")
+    }
+
+    def displayStats(sep: Boolean): Unit = {
+      if(sep) println("=" * 20)
+
+      println(s"Total standard tweets events ${tweetsMeter.count}")
+      println(s"Tweets per second: ${tweetsMeter.meanRate}")
+      println(s"Average tweets per second in the last minute: ${tweetsMeter.oneMinuteRate()} (est. ${tweetsMeter.oneMinuteRate() * 60.0}/min)")
+      println(s"Average tweets per second in the last hour: ${tweetsMeter.sixtyMinuteRate()} (est. ${tweetsMeter.sixtyMinuteRate() * 3600.0}/hour)")
+
+      println(s"Percent of tweets with emojis (${totalTweetsEmojis.count} total): ${percentOfTweets(totalTweetsEmojis.count)}")
+      println(s"Percent of tweets with urls (${Stats.Urls.total.count} total): ${percentOfTweets(Stats.Urls.total.count)}")
+      println(s"Percent of tweets with photos (${Stats.Photos.total.count} total): ${percentOfTweets(Stats.Photos.total.count)}")
+
+      println(s"Top hashtags: ${Stats.Hashtags.top().mkString(", ")}")
+      println(s"Top languages: ${Stats.Languages.top().mkString(", ")}")
+      println(s"Top countries: ${Stats.Countries.top().mkString(", ")}")
+      println(s"Top emojis: ${Stats.Emojis.top().mkString(", ")}")
+      println(s"Top urls: ${Stats.Urls.top().mkString(", ")}")
+      println()
+      println()
+    }
   }
 }
 

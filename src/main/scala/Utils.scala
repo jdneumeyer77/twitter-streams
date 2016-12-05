@@ -6,7 +6,6 @@ import scala.util.Try
 
 object Utils {
   private val reverseLongOrdering = Ordering.Long.reverse
-
   implicit final class IncrDictionary(val map: TrieMap[String,Long]) extends AnyVal {
     def addOrIncr(key: String) = {
        val keyLowered = key.toLowerCase
@@ -17,7 +16,7 @@ object Utils {
     }
 
     def valueOf(key: String) = {
-      map.getOrElse(key.toLowerCase, 0L)
+      map.getOrElse(key.toLowerCase, -1L)
     }
 
     def top(n: Int) = {
@@ -25,8 +24,8 @@ object Utils {
     }
   }
 
-  private val simpleUnexscape = Pattern.compile("""\""", Pattern.LITERAL)
+  private val simpleUnescape = Pattern.compile("""\""", Pattern.LITERAL)
   def domainFrom(expandedUrl: String): Try[String] = {
-    Try(new URL(simpleUnexscape.matcher(expandedUrl).replaceAll("")).getHost.toLowerCase)
+    Try(new URL(simpleUnescape.matcher(expandedUrl).replaceAll("")).getHost.toLowerCase)
   }
 }
